@@ -78,8 +78,9 @@ async def createProductHandler(data):
 async def updateProductDetailsHandler(product_id, data):
     session = SessionLocal()
     try: 
-        if data['sku_id']: 
-         existing_product = session.query(Product).filter(Product.sku_id == data['sku_id']).first()
+        new_sku = data.get("sku_id")
+        if new_sku: 
+         existing_product = session.query(Product).filter(Product.sku_id == new_sku).first()
          if existing_product:
             raise HTTPException(
                 status_code=400,
