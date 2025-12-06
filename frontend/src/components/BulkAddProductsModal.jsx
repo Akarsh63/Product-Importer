@@ -1,29 +1,63 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { v4 as uuidv4 } from "uuid";
 
-export default function BulkAddProductsModal({
-    showModal,
-    setShowModal,
-    onUpdate
-}) {
-    if (!showModal) return null;
-
+export default function BulkAddProductsModal({ showModal, setShowModal, onUpdate }) {
     const API_URL = import.meta.env.VITE_API_URL;
+
     const [file, setFile] = useState(null);
     const [isExecuting, setIsExecuting] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [clientId, setClientId] = useState(null);
+    const wsRef = useRef(null);
+
+    // Generate clientId when modal opens
+    useEffect(() => {
+        if (showModal) {
+            setClientId(uuidv4());
+        } else {
+            // Clean up on close
+            if (wsRef.current) wsRef.current.close();
+            setFile(null);
+            setProgress(0);
+            setClientId(null);
+        }
+    }, [showModal]);
+
+    // Setup WebSocket connection
+    useEffect(() => {
+        if (!clientId) return;
+
+        const ws = new WebSocket(`${API_URL.replace(/^http/, 'ws')}/ws/${clientId}`);
+        wsRef.current = ws;
+
+        ws.onmessage = (event) => {
+            console.log(event)
+            const data = JSON.parse(event.data);
+            if (data.percentage !== undefined) {
+                setProgress(data.percentage);
+            }
+        };
+
+        ws.onclose = () => console.log("WebSocket closed");
+        ws.onerror = (err) => console.error("WebSocket error:", err);
+
+        return () => ws.close();
+    }, [clientId]);
 
     const handleCancel = () => {
         if (isExecuting) return;
+        if (wsRef.current) wsRef.current.close();
+
         setFile(null);
         setProgress(0);
+        setClientId(null);
         setShowModal(false);
     };
 
     const handleFileChange = (e) => {
         const selected = e.target.files[0];
-
         if (!selected) return;
 
         if (!selected.name.endsWith(".csv")) {
@@ -47,6 +81,7 @@ export default function BulkAddProductsModal({
 
             const formData = new FormData();
             formData.append("file", file);
+            formData.append("client_id", clientId);
 
             const url = API_URL + "/products/bulk-upload-csv";
 
@@ -57,13 +92,14 @@ export default function BulkAddProductsModal({
             setShowModal(false);
 
         } catch (error) {
-            const errorMessage =
-                error?.response?.data?.message || error.message;
+            const errorMessage = error?.response?.data?.message || error.message;
             toast.error(errorMessage);
         } finally {
             setIsExecuting(false);
         }
     };
+
+    if (!showModal) return null;
 
     return (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">

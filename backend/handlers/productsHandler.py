@@ -8,6 +8,8 @@ from sqlalchemy.dialects.postgresql import insert
 from fastapi import HTTPException
 from datetime import datetime
 from sqlalchemy import func
+from websocket import manager
+import asyncio
 
 async def getProductsHandler(payload):
     page = payload['page']
@@ -182,17 +184,16 @@ async def createProductsBulkHandler(file, client_id):
 
                     processed_rows += batch_size
 
-                    processed_pecentage = (processed_rows / total_rows) * 100
-
+                    processed_percentage = (processed_rows / total_rows) * 100
                     # Send progress to client
                     await manager.send_progress(client_id, {
                         "processed_rows": processed_rows,
                         "total_rows": total_rows,
                         "percentage": processed_percentage
                     })
+                    await asyncio.sleep(0)
 
                 except Exception as e:
-                    # 
                     raise e
                 
         if len(batch) > 0:

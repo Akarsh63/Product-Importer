@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, File, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, File, UploadFile, WebSocket, WebSocketDisconnect, Form
 from db import create_tables
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -6,7 +6,7 @@ from handlers.productsHandler import getProductsHandler, createProductHandler, d
 from models import Product
 from schemas import ProductSchema, ProductUpdateSchema
 from fastapi.middleware.cors import CORSMiddleware
-from websocket import ConnectionManager
+from websocket import manager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -26,8 +26,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-manager = ConnectionManager()
 
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
@@ -96,12 +94,12 @@ async def createProductController(data: ProductSchema):
         })
 
 @app.post('/products/bulk-upload-csv')
-async def createProductsBulkController(file: UploadFile = File(...)):
+async def createProductsBulkController(file: UploadFile , client_id: str = Form(...)):
     try: 
         if not file:
             raise HTTPException(status_code=404, detail="No upload file sent")
 
-        await createProductsBulkHandler(file)
+        await createProductsBulkHandler(file, client_id)
 
         return {
             'status': True,
